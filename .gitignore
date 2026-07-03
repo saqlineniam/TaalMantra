@@ -1,0 +1,18 @@
+# Node.js dependency directories
+node_modules/
+
+# Production build outputs
+dist/
+
+# Android build outputs & local properties
+android/app/build/
+android/app/src/main/assets/public/
+android/app/src/main/assets/capacitor.config.json
+android/.gradle/
+android/local.properties
+
+# Environment variables & system files
+.env
+.env.local
+.DS_Store
+*.log

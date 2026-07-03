@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>TaalMantra - Indian Classical Metronome</title>
+    <!-- Inter for Sans-serif body -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+    
+    <!-- 🚨 RUNTIME ERROR BOUNDARY LOGGER FOR MOBILE WEBVIEW DEBUGGING -->
+    <script>
+      window.onerror = function(msg, url, line, col, error) {
+        var errDiv = document.createElement('div');
+        errDiv.style.position = 'fixed';
+        errDiv.style.top = '0';
+        errDiv.style.left = '0';
+        errDiv.style.width = '100vw';
+        errDiv.style.height = '100vh';
+        errDiv.style.backgroundColor = '#0b0f19';
+        errDiv.style.color = '#f43f5e';
+        errDiv.style.padding = '24px';
+        errDiv.style.zIndex = '999999';
+        errDiv.style.overflow = 'auto';
+        errDiv.style.fontFamily = 'monospace';
+        errDiv.style.fontSize = '14px';
+        errDiv.style.lineHeight = '1.6';
+        
+        var stack = error && error.stack ? error.stack : 'No stacktrace available';
+        
+        errDiv.innerHTML = '<h1 style="font-size: 22px; color: #fda4af; margin-bottom: 16px;">🚨 Application Startup Crash</h1>' +
+          '<div style="background-color: #1e1b4b; border: 1px solid #312e81; padding: 16px; rounded-lg; margin-bottom: 16px;">' +
+          '<p style="margin: 4px 0;"><b>Message:</b> ' + msg + '</p>' +
+          '<p style="margin: 4px 0;"><b>Location:</b> ' + url + '</p>' +
+          '<p style="margin: 4px 0;"><b>Line/Col:</b> ' + line + ':' + col + '</p>' +
+          '</div>' +
+          '<p><b>Stacktrace:</b></p>' +
+          '<pre style="background-color: #111827; padding: 16px; border-radius: 8px; overflow-x: auto; border: 1px solid #1f2937; color: #9ca3af;">' + stack + '</pre>';
+        
+        document.body.appendChild(errDiv);
+        return false;
+      };
+
+      window.onunhandledrejection = function(event) {
+        var errDiv = document.createElement('div');
+        errDiv.style.position = 'fixed';
+        errDiv.style.top = '0';
+        errDiv.style.left = '0';
+        errDiv.style.width = '100vw';
+        errDiv.style.height = '100vh';
+        errDiv.style.backgroundColor = '#0b0f19';
+        errDiv.style.color = '#fb923c';
+        errDiv.style.padding = '24px';
+        errDiv.style.zIndex = '999999';
+        errDiv.style.overflow = 'auto';
+        errDiv.style.fontFamily = 'monospace';
+        errDiv.style.fontSize = '14px';
+        errDiv.style.lineHeight = '1.6';
+        
+        errDiv.innerHTML = '<h1 style="font-size: 22px; color: #ffedd5; margin-bottom: 16px;">🚨 Unhandled Promise Rejection</h1>' +
+          '<div style="background-color: #1e1b4b; border: 1px solid #312e81; padding: 16px; rounded-lg;">' +
+          '<p style="margin: 4px 0;"><b>Reason:</b> ' + event.reason + '</p>' +
+          '</div>';
+        
+        document.body.appendChild(errDiv);
+      };
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="./src/main.jsx"></script>
+  </body>
+</html>
