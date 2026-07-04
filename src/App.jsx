@@ -34,6 +34,7 @@ class AdvancedAudioEngine {
     
     // Decoded Audio Buffers for real recorded Tabla strokes and loops
     this.buffers = {};
+    this.stretchedBufferCache = {}; // Cache for time-stretched loop AudioBuffers
     this.isLoaded = false;
     
     // Real loop source trackers
@@ -155,21 +156,104 @@ class AdvancedAudioEngine {
     this.tanpuraMasterGainNode = null;
   }
 
+  // --- OLA TIME STRETCHING ENGINE ---
+  getOrCreateStretchedBuffer(loopName, bpm) {
+    const originalBuffer = this.buffers[loopName];
+    if (!originalBuffer) return null;
+
+    // Round BPM to avoid caching minor fractional float variations
+    const roundedBpm = Math.round(bpm * 10) / 10;
+    const cacheKey = `${loopName}_${roundedBpm}`;
+    if (this.stretchedBufferCache[cacheKey]) {
+      return this.stretchedBufferCache[cacheKey];
+    }
+
+    const stretchFactor = roundedBpm / 120.0;
+    
+    // If tempo matches base recording, skip stretching to preserve raw quality
+    if (Math.abs(stretchFactor - 1.0) < 0.005) {
+      this.stretchedBufferCache[cacheKey] = originalBuffer;
+      return originalBuffer;
+    }
+
+    try {
+      const numChannels = originalBuffer.numberOfChannels;
+      const sampleRate = originalBuffer.sampleRate;
+      
+      // Standard 45ms frame size is ideal for transient acoustic drums
+      const frameSize = Math.floor(sampleRate * 0.045);
+      const hopSizeInput = Math.floor(frameSize / 2);
+      const hopSizeOutput = Math.floor(hopSizeInput / stretchFactor);
+      
+      const numFrames = Math.floor((originalBuffer.length - frameSize) / hopSizeInput);
+      const outputLength = Math.floor(numFrames * hopSizeOutput + frameSize);
+      
+      const outputBuffer = this.ctx.createBuffer(numChannels, outputLength, sampleRate);
+      
+      // Hann Window to crossfade overlapping grains cleanly
+      const windowFn = new Float32Array(frameSize);
+      for (let i = 0; i < frameSize; i++) {
+        windowFn[i] = 0.5 * (1 - Math.cos((2 * Math.PI * i) / (frameSize - 1)));
+      }
+      
+      for (let c = 0; c < numChannels; c++) {
+        const inputData = originalBuffer.getChannelData(c);
+        const outputData = outputBuffer.getChannelData(c);
+        
+        const accumulator = new Float32Array(outputLength);
+        const windowSum = new Float32Array(outputLength);
+        
+        for (let f = 0; f < numFrames; f++) {
+          const inputOffset = f * hopSizeInput;
+          const outputOffset = f * hopSizeOutput;
+          
+          for (let i = 0; i < frameSize; i++) {
+            const inIdx = inputOffset + i;
+            const outIdx = Math.floor(outputOffset + i);
+            
+            if (inIdx < inputData.length && outIdx < outputLength) {
+              const val = inputData[inIdx] * windowFn[i];
+              accumulator[outIdx] += val;
+              windowSum[outIdx] += windowFn[i];
+            }
+          }
+        }
+        
+        // Normalize overlap gain flat across all samples
+        for (let i = 0; i < outputLength; i++) {
+          if (windowSum[i] > 0.01) {
+            outputData[i] = accumulator[i] / windowSum[i];
+          } else {
+            outputData[i] = accumulator[i];
+          }
+        }
+      }
+      
+      this.stretchedBufferCache[cacheKey] = outputBuffer;
+      return outputBuffer;
+    } catch (e) {
+      console.error("Failed to stretch audio loop buffer:", e);
+      return originalBuffer;
+    }
+  }
+
   // --- REAL TABLA LOOP PLAYBACK ---
   startTablaLoop(taalId, bpm, scaleFreq) {
     this.init();
     this.stopTablaLoop();
 
     const loopName = `loop_${taalId}`;
-    const buffer = this.buffers[loopName];
+    
+    // Fetch time-stretched, pitch-preserved buffer from our OLA engine
+    const buffer = this.getOrCreateStretchedBuffer(loopName, bpm);
     if (!buffer) return;
 
     const source = this.ctx.createBufferSource();
     source.buffer = buffer;
     source.loop = true;
 
-    // Use sample-accurate playbackRate. Base loop is recorded at 120 BPM.
-    const rate = bpm / 120.0;
+    // Pitch shift ONLY to match scale key (Reference C3 = 130.81Hz). Tempo changes have 0% pitch effect!
+    const rate = scaleFreq / 130.81;
     source.playbackRate.setValueAtTime(rate, this.ctx.currentTime);
 
     this.tablaLoopGain = this.ctx.createGain();
@@ -186,13 +270,6 @@ class AdvancedAudioEngine {
     if (this.tablaLoopSource) {
       try { this.tablaLoopSource.stop(); } catch (e) {}
       this.tablaLoopSource = null;
-    }
-  }
-
-  updateTablaLoopRate(bpm) {
-    if (this.tablaLoopSource && this.ctx) {
-      const rate = bpm / 120.0;
-      this.tablaLoopSource.playbackRate.setValueAtTime(rate, this.ctx.currentTime);
     }
   }
 
@@ -1048,11 +1125,7 @@ export default function App() {
   // Real Tabla Loop playback controller
   useEffect(() => {
     if (isPlaying && tablaMode === 'loop' && soundMode === 'tabla') {
-      if (!engine.tablaLoopSource) {
-        engine.startTablaLoop(currentTaal.id, bpm, tanpuraScale.freq);
-      } else {
-        engine.updateTablaLoopRate(bpm);
-      }
+      engine.startTablaLoop(currentTaal.id, bpm, tanpuraScale.freq);
     } else {
       engine.stopTablaLoop();
     }
